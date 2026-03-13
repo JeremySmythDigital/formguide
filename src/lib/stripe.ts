@@ -1,9 +1,26 @@
 import Stripe from 'stripe';
 import { loadStripe } from '@stripe/stripe-js';
 
-// Server-side Stripe client
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2026-02-25.clover' as any,
+// Lazy-loaded server-side Stripe client
+let stripeClient: Stripe | null = null;
+
+function getStripeServer(): Stripe {
+  if (!stripeClient) {
+    const key = process.env.STRIPE_SECRET_KEY;
+    if (!key) {
+      // Return a mock for build/development
+      console.warn('Stripe not configured. Using mock client.');
+      return new Stripe('sk_test_placeholder', { apiVersion: '2026-02-25.clover' as any });
+    }
+    stripeClient = new Stripe(key, { apiVersion: '2026-02-25.clover' as any });
+  }
+  return stripeClient;
+}
+
+export const stripe = new Proxy({} as Stripe, {
+  get(target, prop) {
+    return getStripeServer()[prop as keyof Stripe];
+  }
 });
 
 // Client-side Stripe
